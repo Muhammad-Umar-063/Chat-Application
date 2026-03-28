@@ -22,8 +22,8 @@ Auth ---> JWT, bcrypt
 Dev Tools ---> ts-node, nodemon, dotenv
 
 
-# Start the Backend
+---Start the Backend
 npm run dev
 
-# Start the Frontend
+---Start the Frontend
 npm run dev
