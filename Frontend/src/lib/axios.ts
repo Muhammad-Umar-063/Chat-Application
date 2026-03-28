@@ -1,9 +1,6 @@
 import ax from 'axios';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-const axios = ax.create({
-    baseURL: process.env.VITE_APP_BASE_URL,
+export const axiosInstance = ax.create({
+    baseURL: 'http://localhost:5173/api',
     withCredentials: true,
 })
