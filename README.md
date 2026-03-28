@@ -59,7 +59,7 @@ cd ../Frontend && npm install
 Create a `.env` file inside the `Backend/` directory:
 
 ```env
-PORT=5000
+PORT=5001
 MONGO_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=your_jwt_secret
 CLIENT_URL=http://localhost:5173
@@ -76,17 +76,6 @@ npm run dev
 ```
 
 The client runs on `http://localhost:5173` and the server on `http://localhost:5001`.
-
----
-
-## 🔌 API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/signup` | Register a new user |
-| `POST` | `/api/auth/login` | Log in and receive JWT |
-| `GET` | `/api/messages/:userId` | Fetch chat history |
-| `POST` | `/api/messages/send/:userId` | Send a message |
 
 ---
 
