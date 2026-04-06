@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import authRoutees from './routes/auth.routes.ts';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import { connectDB } from './lib/db.ts';
 import cookieParser from 'cookie-parser';
 import msgRoutes from './routes/msg.routes.ts';
@@ -12,6 +13,10 @@ const PORT = process.env.PORT
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+}))
 
 app.use("/api/auth", authRoutees);
 app.use("/api/messages", msgRoutes);

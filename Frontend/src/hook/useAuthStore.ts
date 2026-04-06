@@ -4,13 +4,13 @@ import { axiosInstance } from '../lib/axios.js'
 
 interface User {
   _id: string
-  fullname: string
+  fullName: string
   email: string
-  profilePicture?: string
+  profilePic?: string
 }
 
 interface AuthStore {
-  user: User | null
+  authUser: User | null
   isLoggedIn: boolean
   isSigningUp?: boolean
   isUpdatingProfile?: boolean
@@ -20,7 +20,7 @@ interface AuthStore {
 }
 
 const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
+  authUser: null,
   isLoggedIn: false,
   isSigningUp: false,
   isUpdatingProfile: false,
@@ -28,13 +28,13 @@ const useAuthStore = create<AuthStore>((set) => ({
 
   checkAuth: async () => {
     try {
-      const res = await axiosInstance.get('/auth/check');
-      if (res.data.success){
-        set({ user : res.data.user, isLoggedIn: true });
+      const res = await axiosInstance.get('/auth/check-auth');
+      if (res.data){
+        set({ authUser : res.data, isLoggedIn: true });
       }
     } catch (error) {
       console.error('Error checking auth:', error);
-      set({ user: null, isLoggedIn: false }); 
+      set({ authUser: null, isLoggedIn: false }); 
     } finally{
       set({ isCheckingAuth: false });
     }
