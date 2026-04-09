@@ -92,26 +92,34 @@ export const login = async (req: Request<{}, {}, { email: string; password: stri
 };
 
 export const logout = async (_req: Request, res: Response): Promise<void> => {
-    try{
-        res.cookie('token', "", {maxAge: 0})
-        res.status(200).json({message : 'Logged out successfully!'})
-    }catch(error){
+    try {
+        res.clearCookie('token', { 
+        maxAge: 0, 
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        });
+        res.status(200).json({ message: 'Logged out successfully!' });
+    } catch (error) {
         console.error(error);
-        res.status(500).json({message : 'Server error!'})
+        res.status(500).json({ message: 'Server error!' });
     }
 };
 
-export const updateProfile = async (req: Request<{}, {}, { profilePic: string }>, res: Response): Promise<void> => {
+export const updateProfile = async (req: Request<{}, {}, { profilePic?: string }>, res: Response): Promise<void> => {
     try {
         const { profilePic } = req.body;
         const userId = req.userId;
 
-        if (!profilePic) {
-            res.status(400).json({ message: 'Profile picture is required!' });
+        if (!profilePic || typeof profilePic !== 'string') {
+            res.status(400).json({ message: 'A valid base64 profile picture is required!' });
             return;
         }
 
-        const uploadPic = await cloudinary.uploader.upload(profilePic)
+        const uploadPic = await cloudinary.uploader.upload(profilePic, {
+            resource_type: 'image',
+            folder: 'profile_pics',
+        })
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
