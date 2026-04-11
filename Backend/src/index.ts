@@ -5,8 +5,7 @@ import cors from 'cors';
 import { connectDB } from './lib/db.ts';
 import cookieParser from 'cookie-parser';
 import msgRoutes from './routes/msg.routes.ts';
-
-const app: Express = express();
+import {app} from './lib/socket.ts';
 
 dotenv.config();
 const PORT = Number(process.env.PORT) || 5001;
