@@ -7,14 +7,19 @@ import cloudinary from '../lib/cloudinary.ts';
 export const getMsgs = async (req : express.Request, res : express.Response) => {
     try {
         const { id: otherUserId } = req.params
-        const myId = req.user._id
+        const myId = req.userId
+
+        if (!myId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
 
         const Messages = await Msgs.find({
             $or: [
                 {senderId: myId, receiverId: otherUserId},
                 {senderId: otherUserId, receiverId: myId}
             ]
-        })
+        }).sort({ createdAt: 1 })
         res.status(200).json(Messages);
     } catch (error) {
         console.error("Error fetching messages:", error);
@@ -35,9 +40,14 @@ export const getUsersForSidebar = async (req : express.Request, res : express.Re
 
 export const sendMsgs = async (req : express.Request, res : express.Response) => {
     try {
-        const myId = req.user._id;
+        const myId = req.userId;
         const { id: otherUserId } = req.params;
         const { text, image } = req.body;
+
+        if (!myId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
 
         let imageURL;
         if (image) {
