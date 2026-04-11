@@ -5,7 +5,7 @@ import cors from 'cors';
 import { connectDB } from './lib/db.ts';
 import cookieParser from 'cookie-parser';
 import msgRoutes from './routes/msg.routes.ts';
-import {app} from './lib/socket.ts';
+import {app, server} from './lib/socket.ts';
 
 dotenv.config();
 const PORT = Number(process.env.PORT) || 5001;
@@ -21,7 +21,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutees);
 app.use("/api/messages", msgRoutes);
 
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
 });
