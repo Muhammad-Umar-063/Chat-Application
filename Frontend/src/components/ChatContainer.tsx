@@ -6,16 +6,21 @@ import MessageSkeleton from "./skeleton/MessageSkeleton"
 import { formatMessageTime } from "../lib/utils"
 import useAuthStore from "../hook/useAuthStore"
 
+
 const ChatContainer = () => {
 
-    const { selectedChatUser, messages, isMsgLoading, getMsgs } = useChatStore()
+    const { selectedChatUser, messages, isMsgLoading, getMsgs, SubscribeToMsgs, unsubscribeFromMessages } = useChatStore()
     const { authUser } = useAuthStore()
   const messageEndRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
       if (!selectedChatUser?._id) return
       getMsgs(selectedChatUser._id)
-    }, [selectedChatUser?._id, getMsgs])
+      SubscribeToMsgs()
+      return () => {
+        unsubscribeFromMessages()
+      }
+    }, [selectedChatUser?._id, getMsgs, SubscribeToMsgs, unsubscribeFromMessages])
 
     useEffect(() => {
       messageEndRef.current?.scrollIntoView({ behavior: "smooth" })

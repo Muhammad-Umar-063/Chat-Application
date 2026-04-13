@@ -2,24 +2,25 @@ import { create } from 'zustand'
 import { axiosInstance } from '../lib/axios.js'
 import { toast } from 'react-hot-toast'
 import { AxiosError } from 'axios'
+import useAuthStore from './useAuthStore.js'
 
 interface User {
-  _id: string
-  fullName: string
-  email: string
-  profilePic?: string
-  createdAt: string
+    _id: string
+    fullName: string
+    email: string
+    profilePic?: string
+    createdAt: string
 }
 
 interface Message {
-  _id: string
-        senderId?: string | { _id: string }
+    _id: string
+    senderId?: string | { _id: string }
     receiverId?: string
-        sender?: User | string
+    sender?: User | string
     text?: string
-        message?: string
-  createdAt: string,
-  image ?: string | null
+    message?: string
+    createdAt: string,
+    image?: string | null
 }
 
 interface ChatStore {
@@ -29,13 +30,15 @@ interface ChatStore {
     isUserLoading: boolean,
     isMsgLoading: boolean
 
+    unsubscribeFromMessages: () => void
+    SubscribeToMsgs: () => void
     getUsers: () => Promise<void>
     getMsgs: (userId: string) => Promise<void>
     sendMsg: (userId: string, text: string, image?: string) => Promise<void>
     setSelectedChatUser: (selectedChatUser: User | null) => void
 }
 
-export const useChatStore = create<ChatStore>()((set) => ({
+export const useChatStore = create<ChatStore>()((set, get) => ({
     users: [],
     messages: [],
     selectedChatUser: null,
@@ -43,47 +46,66 @@ export const useChatStore = create<ChatStore>()((set) => ({
     isMsgLoading: false,
 
 
-getUsers: async () => {
-    set({ isUserLoading: true });
-    try{ 
-        const res = await axiosInstance.get<User[]>('/messages/users')
-        set({ users: res.data})
-    }catch (error){
-        const err = error as AxiosError<{ message: string }>;
-        toast.error(err.response?.data?.message ?? 'Failed to load users');
-    }finally{
-        set({ isUserLoading: false });
-    }
-},
+    getUsers: async () => {
+        set({ isUserLoading: true });
+        try {
+            const res = await axiosInstance.get<User[]>('/messages/users')
+            set({ users: res.data })
+        } catch (error) {
+            const err = error as AxiosError<{ message: string }>;
+            toast.error(err.response?.data?.message ?? 'Failed to load users');
+        } finally {
+            set({ isUserLoading: false });
+        }
+    },
 
-getMsgs: async (userId: string) => {
-    set({ isMsgLoading: true });
-    try{
-        const res = await axiosInstance.get<Message[]>(`/messages/${userId}`)
-        set({ messages: res.data})
-    }catch (error){
-        const err = error as AxiosError<{ message: string }>;
-        toast.error(err.response?.data?.message ?? 'Failed to load messages');
-    }finally{
-        set({ isMsgLoading: false });
-    }
-},
+    getMsgs: async (userId: string) => {
+        set({ isMsgLoading: true });
+        try {
+            const res = await axiosInstance.get<Message[]>(`/messages/${userId}`)
+            set({ messages: res.data })
+        } catch (error) {
+            const err = error as AxiosError<{ message: string }>;
+            toast.error(err.response?.data?.message ?? 'Failed to load messages');
+        } finally {
+            set({ isMsgLoading: false });
+        }
+    },
 
-sendMsg: async (userId: string, text: string, image?: string) => {
-    set({ isMsgLoading: true });
-    try{
-        const res = await axiosInstance.post<Message>(`/messages/send/${userId}`, { text, image })
-        set((state) => ({ messages: [...state.messages, res.data] }))
-    }catch (error){
-        const err = error as AxiosError<{ message: string }>;
-        toast.error(err.response?.data?.message ?? 'Failed to send message');
-    }finally{
-        set({ isMsgLoading: false });
-    }
-},
+    sendMsg: async (userId: string, text: string, image?: string) => {
+        set({ isMsgLoading: true });
+        try {
+            const res = await axiosInstance.post<Message>(`/messages/send/${userId}`, { text, image })
+            set((state) => ({ messages: [...state.messages, res.data] }))
+        } catch (error) {
+            const err = error as AxiosError<{ message: string }>;
+            toast.error(err.response?.data?.message ?? 'Failed to send message');
+        } finally {
+            set({ isMsgLoading: false });
+        }
+    },
 
-setSelectedChatUser: (selectedChatUser: User | null) => {
-    set({ selectedChatUser })
-}
+    SubscribeToMsgs: () => {
+        const {selectedChatUser} = get()
+        if (!selectedChatUser) return 
+
+        const socket = useAuthStore.getState().socket
+
+        socket?.on("newMessage", (newMessage) => {
+            set({
+                messages: [...get().messages, newMessage]
+            })
+        })
+    },
+
+    unsubscribeFromMessages: () => {
+    const socket = useAuthStore.getState().socket;
+    socket?.off("newMessage");
+  },
+
+
+    setSelectedChatUser: (selectedChatUser: User | null) => {
+        set({ selectedChatUser })
+    }
 
 }))
