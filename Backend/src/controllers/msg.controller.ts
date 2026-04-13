@@ -2,12 +2,13 @@ import express from 'express';
 import User from '../models/user.model.ts';
 import Msgs from '../models/msg.model.ts';
 import cloudinary from '../lib/cloudinary.ts';
+import { getReceiverSocketId, io } from '../lib/socket.ts';
 
 
 export const getMsgs = async (req : express.Request, res : express.Response) => {
     try {
-        const { id: otherUserId } = req.params
-        const myId = req.userId
+        const { id: otherUserId } = req.params as { id: string };
+        const myId = req.userId as string;
 
         if (!myId) {
             res.status(401).json({ error: "Unauthorized" });
@@ -29,7 +30,7 @@ export const getMsgs = async (req : express.Request, res : express.Response) => 
 
 export const getUsersForSidebar = async (req : express.Request, res : express.Response) => {
     try{
-        const loggedInUserId = req.user._id;
+        const loggedInUserId = req.user._id as string;
         const getUsers = await User.find({_id: { $ne : loggedInUserId }}).select('-password');
         res.status(200).json(getUsers);
     } catch (error) {
@@ -40,9 +41,9 @@ export const getUsersForSidebar = async (req : express.Request, res : express.Re
 
 export const sendMsgs = async (req : express.Request, res : express.Response) => {
     try {
-        const myId = req.userId;
-        const { id: otherUserId } = req.params;
-        const { text, image } = req.body;
+        const myId = req.userId as string;
+        const { id: otherUserId } = req.params as { id: string };
+        const { text, image } = req.body as { text: string; image: string };
 
         if (!myId) {
             res.status(401).json({ error: "Unauthorized" });
@@ -62,10 +63,15 @@ export const sendMsgs = async (req : express.Request, res : express.Response) =>
             image: imageURL
         });
 
-        // socketio here 
-
+        // socketio here to emit new message to receiver in real time
         await newMsg.save();
         res.status(201).json(newMsg);
+
+
+        const receiverSocketId = getReceiverSocketId(otherUserId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('newMessage', newMsg)
+        }
     } catch (error) {
         console.error("Error sending message:", error);
         res.status(500).json({ error: "Internal server error" });
