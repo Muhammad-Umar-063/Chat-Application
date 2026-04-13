@@ -28,7 +28,8 @@ interface ChatStore {
     messages: Message[]
     selectedChatUser?: User | null,
     isUserLoading: boolean,
-    isMsgLoading: boolean
+    isMsgLoading: boolean,
+    isOtherUserTyping: boolean
 
     unsubscribeFromMessages: () => void
     SubscribeToMsgs: () => void
@@ -36,6 +37,7 @@ interface ChatStore {
     getMsgs: (userId: string) => Promise<void>
     sendMsg: (userId: string, text: string, image?: string) => Promise<void>
     setSelectedChatUser: (selectedChatUser: User | null) => void
+    setIsOtherUserTyping: (isTyping: boolean) => void
 }
 
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -44,6 +46,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     selectedChatUser: null,
     isUserLoading: false,
     isMsgLoading: false,
+    isOtherUserTyping: false,
 
 
     getUsers: async () => {
@@ -73,15 +76,12 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     },
 
     sendMsg: async (userId: string, text: string, image?: string) => {
-        set({ isMsgLoading: true });
         try {
             const res = await axiosInstance.post<Message>(`/messages/send/${userId}`, { text, image })
             set((state) => ({ messages: [...state.messages, res.data] }))
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
             toast.error(err.response?.data?.message ?? 'Failed to send message');
-        } finally {
-            set({ isMsgLoading: false });
         }
     },
 
@@ -90,22 +90,42 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         if (!selectedChatUser) return 
 
         const socket = useAuthStore.getState().socket
+        if (!socket) return
 
-        socket?.on("newMessage", (newMessage) => {
+        // Remove old listeners first to prevent duplicates
+        socket.off("newMessage")
+        socket.off("typing")
+        socket.off("stopTyping")
+
+        socket.on("newMessage", (newMessage) => {
             set({
                 messages: [...get().messages, newMessage]
             })
+        })
+
+        socket.on("typing", () => {
+            set({ isOtherUserTyping: true })
+        })
+
+        socket.on("stopTyping", () => {
+            set({ isOtherUserTyping: false })
         })
     },
 
     unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket?.off("newMessage");
+    socket?.off("typing");
+    socket?.off("stopTyping");
   },
 
 
     setSelectedChatUser: (selectedChatUser: User | null) => {
         set({ selectedChatUser })
+    },
+
+    setIsOtherUserTyping: (isTyping: boolean) => {
+        set({ isOtherUserTyping: isTyping })
     }
 
 }))

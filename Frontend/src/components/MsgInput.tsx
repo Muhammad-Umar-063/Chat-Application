@@ -1,13 +1,16 @@
 import React, { useRef, useState } from 'react'
 import { useChatStore } from '../hook/useChatStore'
+import useAuthStore from '../hook/useAuthStore'
 import { X, Image, Send } from 'lucide-react'
 
 const MsgInput = () => {
 
     const { sendMsg, selectedChatUser } = useChatStore()
+    const { socket } = useAuthStore()
     const [text, setText] = useState<string>("")
     const [previewImg, setPreviewImg] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const handleImgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
@@ -20,10 +23,30 @@ const MsgInput = () => {
       }
     }
 
+    const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value
+      setText(value)
+
+      // Emit typing event
+      socket?.emit("typing", { receiverId: selectedChatUser?._id })
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+
+      // Set new timeout to emit stopTyping after 1 second of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        socket?.emit("stopTyping", { receiverId: selectedChatUser?._id })
+      }, 1000)
+    }
+
     const handleSendMsg = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
       if (!selectedChatUser?._id) return
       if (!text.trim() && !previewImg) return
+
+      // Emit stopTyping before sending
+      socket?.emit("stopTyping", { receiverId: selectedChatUser._id })
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
       await sendMsg(selectedChatUser._id, text.trim(), previewImg ?? undefined)
       setText("")
@@ -65,7 +88,7 @@ const MsgInput = () => {
             className="w-full input input-bordered rounded-lg input-sm sm:input-md"
             placeholder="Type a message..."
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleTyping}
           />
           <input
             type="file"
