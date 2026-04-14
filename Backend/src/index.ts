@@ -10,11 +10,15 @@ import {app, server} from './lib/socket.ts';
 
 dotenv.config();
 const PORT = Number(process.env.PORT) || 5001;
+const allowedOrigins = (process.env.CLIENT_URLS || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
 
 const __dirname = path.resolve();
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+        origin: allowedOrigins,
     credentials: true,
 }))
 app.use(express.json({ limit: '10mb' }));

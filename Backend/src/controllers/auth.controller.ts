@@ -131,11 +131,12 @@ export const login = async (req: Request<{}, {}, { username: string; password: s
 
 export const logout = async (_req: Request, res: Response): Promise<void> => {
     try {
+        const isProduction = process.env.NODE_ENV === 'production';
         res.clearCookie('token', { 
         maxAge: 0, 
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         });
         res.status(200).json({ message: 'Logged out successfully!' });
     } catch (error) {

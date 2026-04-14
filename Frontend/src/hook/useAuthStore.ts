@@ -4,7 +4,11 @@ import { toast } from 'react-hot-toast'
 import { AxiosError } from 'axios'
 import { io } from 'socket.io-client'
 
-const BASE_URL = import.meta.env.MODE === 'development'? 'http://localhost:5001' : '/api'
+const derivedSocketUrl =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/api\/?$/, '') ||
+  (import.meta.env.MODE === 'development' ? 'http://localhost:5001' : window.location.origin)
+
+const SOCKET_BASE_URL = (import.meta.env.VITE_SOCKET_URL as string | undefined) || derivedSocketUrl
 
 interface User {
   _id: string
@@ -118,7 +122,7 @@ const useAuthStore = create<AuthStore>((set, get) => ({
     const { authUser, socket } = get();
     if (!authUser || socket?.connected) return;
     
-    const newSocket = io(BASE_URL, {
+    const newSocket = io(SOCKET_BASE_URL, {
       query: { userId: authUser._id }  // lets the server track online users
     });
     newSocket.connect()
