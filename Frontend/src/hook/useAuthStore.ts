@@ -29,7 +29,7 @@ interface AuthStore {
   checkAuth: () => Promise<void>
   signUp: (data: { fullName: string; username: string; email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
-  login: (data: { email: string; password: string }) => Promise<void>
+  login: (data: { username: string; password: string }) => Promise<void>
   updateProfile: (data: { fullName?: string; profilePic?: string }) => Promise<void>
 }
 

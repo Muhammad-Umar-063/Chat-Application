@@ -2,25 +2,25 @@ import { useState } from "react";
 import useAuthStore from '../hook/useAuthStore'
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare } from "lucide-react";
+import { AtSign, Eye, EyeOff, Loader2, Lock, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState<Boolean>(false);
   const [formData, setFormData] = useState<{
-    fullName: string
-    email: string
+    username: string
     password: string
   }>({
-    fullName: "",
-    email: "",
+    username: "",
     password: "",
   })
   const { login, isLoggingIn } = useAuthStore();
 
   const validationForm = (): string | boolean => {
-    if (!formData.email.trim()) return toast.error("Email is required");
-    if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    if (!/^[a-z0-9_.]{3,20}$/i.test(formData.username)) {
+      return toast.error("Username must be 3-20 chars and can include letters, numbers, _ and .");
+    }
     if (!formData.password) return toast.error("Password is required");
     return true;
   }
@@ -56,18 +56,18 @@ const LoginPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">Email</span>
+                <span className="label-text font-medium">Username</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                  <Mail className="h-5 w-5 text-base-content/40" />
+                  <AtSign className="h-5 w-5 text-base-content/40" />
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   className={`input input-bordered w-full pl-10`}
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="your_username"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
                 />
               </div>
             </div>

@@ -84,16 +84,24 @@ export const signup = async (req: Request<{}, {}, SignupBody>, res: Response): P
     }
 };
 
-export const login = async (req: Request<{}, {}, { email: string; password: string }>, res: Response): Promise<void> => {
-    const {email , password} = req.body
+export const login = async (req: Request<{}, {}, { username: string; password: string }>, res: Response): Promise<void> => {
+    const { username, password } = req.body
 
     try{
-        if (!email || !password) {
+        if (!username || !password) {
             res.status(400).json({message : 'All fields are required!'});
             return;
         }
+
+        const normalizedUsername = username.trim().toLowerCase();
+
+        if (!/^[a-z0-9_.]{3,20}$/.test(normalizedUsername)) {
+            res.status(400).json({ message: "Invalid username format!" });
+            return;
+        }
+
         const user  = await User.findOne({
-            email
+            username: normalizedUsername,
         })
         if (!user){
             res.status(400).json({message : 'Invalid credentials!'});

@@ -8,6 +8,7 @@ interface User {
     _id: string
     fullName: string
     username?: string
+    unreadCount?: number
     email: string
     profilePic?: string
     createdAt: string
@@ -39,6 +40,7 @@ const extractId = (value?: string | { _id: string } | null): string | undefined 
 interface ChatStore {
     users: User[]
     messages: Message[]
+    unreadCounts: Record<string, number>
     selectedChatUser?: User | null,
     isUserLoading: boolean,
     isMsgLoading: boolean,
@@ -62,6 +64,7 @@ interface ChatStore {
 export const useChatStore = create<ChatStore>()((set, get) => ({
     users: [],
     messages: [],
+    unreadCounts: {},
     selectedChatUser: null,
     isUserLoading: false,
     isMsgLoading: false,
@@ -75,7 +78,17 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         set({ isUserLoading: true });
         try {
             const res = await axiosInstance.get<User[]>('/messages/users')
-            set({ users: res.data })
+            const unreadFromApi = Object.fromEntries(
+                res.data.map((user) => [user._id, user.unreadCount ?? 0])
+            )
+
+            set((state) => ({
+                users: res.data,
+                unreadCounts: {
+                    ...state.unreadCounts,
+                    ...unreadFromApi,
+                },
+            }))
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
             toast.error(err.response?.data?.message ?? 'Failed to load users');
@@ -104,12 +117,16 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     },
 
     getMsgs: async (userId: string) => {
-        set({
+        set((state) => ({
             isMsgLoading: true,
             messages: [],
             hasMoreMsgs: false,
             oldestMsgCreatedAt: null,
-        });
+            unreadCounts: {
+                ...state.unreadCounts,
+                [userId]: 0,
+            },
+        }));
         try {
             const res = await axiosInstance.get<GetMsgsResponse | Message[]>(`/messages/${userId}?limit=30`)
             const payload = Array.isArray(res.data)
@@ -180,6 +197,10 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                         ? { ...msg, seen: true, seenAt }
                         : msg
                 ),
+                unreadCounts: {
+                    ...state.unreadCounts,
+                    [userId]: 0,
+                },
             }))
         } catch (error) {
             console.error('Failed to mark messages as seen:', error)
@@ -197,9 +218,6 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     },
 
     SubscribeToMsgs: () => {
-        const {selectedChatUser} = get()
-        if (!selectedChatUser) return 
-
         const socket = useAuthStore.getState().socket
         if (!socket) return
 
@@ -211,35 +229,61 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
         socket.on("newMessage", (newMessage: Message) => {
             const activeUserId = get().selectedChatUser?._id
-            if (!activeUserId) return
+            const authUserId = useAuthStore.getState().authUser?._id
+            if (!authUserId) return
 
             const senderId = extractId(newMessage.senderId) ??
                 (typeof newMessage.sender === 'string' ? newMessage.sender : newMessage.sender?._id)
             const receiverId = extractId(newMessage.receiverId)
+            const isIncoming = receiverId === authUserId
 
-            const isForActiveChat = senderId === activeUserId || receiverId === activeUserId
-            if (!isForActiveChat) return
+            const isForActiveChat = Boolean(activeUserId && (senderId === activeUserId || receiverId === activeUserId))
 
-            set((state) => {
-                if (state.messages.some((msg) => msg._id === newMessage._id)) {
-                    return state
+            if (isForActiveChat) {
+                set((state) => {
+                    if (state.messages.some((msg) => msg._id === newMessage._id)) {
+                        return state
+                    }
+                    return {
+                        messages: [...state.messages, newMessage],
+                    }
+                })
+            }
+
+            if (isIncoming && senderId) {
+                const isFromActiveChat = activeUserId === senderId
+
+                if (isFromActiveChat) {
+                    get().markMsgsAsSeen(senderId)
+                } else {
+                    set((state) => ({
+                        unreadCounts: {
+                            ...state.unreadCounts,
+                            [senderId]: (state.unreadCounts[senderId] ?? 0) + 1,
+                        },
+                    }))
+
+                    if (!get().users.some((user) => user._id === senderId)) {
+                        get().getUsers()
+                    }
                 }
-                return {
-                    messages: [...state.messages, newMessage],
-                }
-            })
-
-            if (senderId === activeUserId) {
-                get().markMsgsAsSeen(activeUserId)
             }
         })
 
-        socket.on("typing", () => {
-            set({ isOtherUserTyping: true })
+        socket.on("typing", ({ senderId }: { senderId?: string } = {}) => {
+            const activeUserId = get().selectedChatUser?._id
+            if (!activeUserId) return
+            if (!senderId || senderId === activeUserId) {
+                set({ isOtherUserTyping: true })
+            }
         })
 
-        socket.on("stopTyping", () => {
-            set({ isOtherUserTyping: false })
+        socket.on("stopTyping", ({ senderId }: { senderId?: string } = {}) => {
+            const activeUserId = get().selectedChatUser?._id
+            if (!activeUserId) return
+            if (!senderId || senderId === activeUserId) {
+                set({ isOtherUserTyping: false })
+            }
         })
 
         socket.on("messagesSeen", ({ messageIds, seenAt }: { messageIds: string[]; seenAt: string }) => {
@@ -263,7 +307,15 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
 
     setSelectedChatUser: (selectedChatUser: User | null) => {
-        set({ selectedChatUser })
+        set((state) => ({
+            selectedChatUser,
+            unreadCounts: selectedChatUser
+                ? {
+                    ...state.unreadCounts,
+                    [selectedChatUser._id]: 0,
+                }
+                : state.unreadCounts,
+        }))
     },
 
     setIsOtherUserTyping: (isTyping: boolean) => {

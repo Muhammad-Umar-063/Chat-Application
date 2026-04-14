@@ -18,8 +18,6 @@ const ChatContainer = () => {
       loadOlderMsgs,
       hasMoreMsgs,
       isLoadingOlderMsgs,
-      SubscribeToMsgs,
-      unsubscribeFromMessages,
       isOtherUserTyping,
       markMsgsAsSeen,
     } = useChatStore()
@@ -35,11 +33,6 @@ const ChatContainer = () => {
       didInitialScrollRef.current = false
       previousMessageCountRef.current = 0
       getMsgs(selectedChatUser._id)
-      SubscribeToMsgs()
-
-      return () => {
-        unsubscribeFromMessages()
-      }
     }, [selectedChatUser?._id])
 
     useEffect(() => {

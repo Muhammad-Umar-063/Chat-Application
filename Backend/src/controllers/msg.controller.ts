@@ -80,6 +80,18 @@ export const getUsersForSidebar = async (req : express.Request, res : express.Re
                     otherUserId: {
                         $cond: [{ $eq: ["$senderId", myObjectId] }, "$receiverId", "$senderId"],
                     },
+                    unreadIncoming: {
+                        $cond: [
+                            {
+                                $and: [
+                                    { $eq: ["$receiverId", myObjectId] },
+                                    { $eq: ["$seen", false] },
+                                ],
+                            },
+                            1,
+                            0,
+                        ],
+                    },
                     createdAt: 1,
                 },
             },
@@ -87,6 +99,7 @@ export const getUsersForSidebar = async (req : express.Request, res : express.Re
                 $group: {
                     _id: "$otherUserId",
                     lastMessageAt: { $max: "$createdAt" },
+                    unreadCount: { $sum: "$unreadIncoming" },
                 },
             },
             { $sort: { lastMessageAt: -1 } },
@@ -101,8 +114,19 @@ export const getUsersForSidebar = async (req : express.Request, res : express.Re
 
         const users = await User.find({ _id: { $in: orderedIds } }).select('-password');
         const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+        const unreadById = new Map(
+            chattedUserIds.map((entry) => [entry._id.toString(), entry.unreadCount ?? 0])
+        );
         const orderedUsers = orderedIds
-            .map((id) => usersById.get(id))
+            .map((id) => {
+                const user = usersById.get(id);
+                if (!user) return null;
+
+                return {
+                    ...user.toObject(),
+                    unreadCount: unreadById.get(id) ?? 0,
+                };
+            })
             .filter(Boolean);
 
         res.status(200).json(orderedUsers);
