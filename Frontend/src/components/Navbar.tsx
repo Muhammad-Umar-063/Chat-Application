@@ -1,6 +1,6 @@
 import {Link} from 'react-router-dom'
 import useAuthStore from '../hook/useAuthStore'
-import { AudioWaveform, LogOut, MessageSquare, Send, Settings, User } from 'lucide-react'
+import { LogOut, Settings, User } from 'lucide-react'
 import FluxChatLogo from './FluxChatLogo'
 
 const Navbar = () => {

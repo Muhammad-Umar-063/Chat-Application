@@ -1,0 +1,21 @@
+{
+  "name": "chat-application",
+  "version": "1.0.0",
+  "description": "A full-stack real-time messaging application built with the **MERN stack** — featuring instant message delivery, user authentication, and a clean, responsive interface.",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm install --prefix Backend && npm install --prefix Frontend && npm run build --prefix Frontend",
+    "start": "npm run start --prefix Backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Muhammad-Umar-063/Chat-Application.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Muhammad-Umar-063/Chat-Application/issues"
+  },
+  "homepage": "https://github.com/Muhammad-Umar-063/Chat-Application#readme"
+}
