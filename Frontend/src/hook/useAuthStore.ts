@@ -9,6 +9,7 @@ const BASE_URL = 'http://localhost:5001';
 interface User {
   _id: string
   fullName: string
+  username?: string
   email: string
   profilePic?: string
   createdAt: string
@@ -26,7 +27,7 @@ interface AuthStore {
   connectSocket: () => void
   disconnectSocket: () => void
   checkAuth: () => Promise<void>
-  signUp: (data: { fullName: string; email: string; password: string }) => Promise<void>
+  signUp: (data: { fullName: string; username: string; email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
   login: (data: { email: string; password: string }) => Promise<void>
   updateProfile: (data: { fullName?: string; profilePic?: string }) => Promise<void>

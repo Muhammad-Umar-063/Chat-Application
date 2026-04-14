@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useAuthStore from '../hook/useAuthStore'
-import { Loader2, Eye, EyeOff, Lock, Mail, User, UserPlus } from 'lucide-react'
+import { Loader2, Eye, EyeOff, Lock, Mail, User, UserPlus, AtSign } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import AuthImagePattern from '../components/AuthImagePattern'
@@ -10,10 +10,12 @@ const SignUpPage = () => {
 
   const [formData, setFormData] = useState<{
     fullName: string
+    username: string
     email: string
     password: string
   }>({
     fullName: "",
+    username: "",
     email: "",
     password: "",
   })
@@ -22,6 +24,10 @@ const SignUpPage = () => {
 
   const validateForm = (): string | boolean => {
     if (!formData.fullName.trim()) return toast.error("Full name is required");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    if (!/^[a-z0-9_.]{3,20}$/i.test(formData.username)) {
+      return toast.error("Username must be 3-20 chars and can include letters, numbers, _ and .")
+    }
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
     if (!formData.password) return toast.error("Password is required");
@@ -85,6 +91,24 @@ const SignUpPage = () => {
                   placeholder="email@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Username</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                  <AtSign className="size-5 text-base-content/40" />
+                </div>
+                <input
+                  type="text"
+                  className={`input input-bordered w-full pl-10`}
+                  placeholder="your_username"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
                 />
               </div>
             </div>

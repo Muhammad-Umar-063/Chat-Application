@@ -14,6 +14,14 @@ const userSchema = new mongo.Schema({
         type: String,
         required: true
     },
+    username: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true,
+        sparse: true
+    },
     profilePic: {
         type: String,
         default: ""

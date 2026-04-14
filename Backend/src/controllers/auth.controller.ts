@@ -8,13 +8,21 @@ interface SignupBody {
     email: string;
     password: string;
     fullName: string;
+    username: string;
 }
 
 export const signup = async (req: Request<{}, {}, SignupBody>, res: Response): Promise<void> => {
-    const { email, password, fullName } : SignupBody = req.body;
+    const { email, password, fullName, username } : SignupBody = req.body;
     try {
-        if (!email || !password || !fullName) {
+        if (!email || !password || !fullName || !username) {
             res.status(400).json({ message: "All fields are required!" });
+            return;
+        }
+
+        const normalizedUsername = username.trim().toLowerCase();
+
+        if (!/^[a-z0-9_.]{3,20}$/.test(normalizedUsername)) {
+            res.status(400).json({ message: "Username must be 3-20 chars and can include letters, numbers, _ and ." });
             return;
         }
 
@@ -23,10 +31,16 @@ export const signup = async (req: Request<{}, {}, SignupBody>, res: Response): P
             return;
         }
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({
+            $or: [{ email }, { username: normalizedUsername }],
+        });
 
         if (existingUser) {
-            res.status(400).json({ message: "User already exists!" });
+            if (existingUser.email === email) {
+                res.status(400).json({ message: "Email already exists!" });
+            } else {
+                res.status(400).json({ message: "Username already taken!" });
+            }
             return;
         }
 
@@ -37,6 +51,7 @@ export const signup = async (req: Request<{}, {}, SignupBody>, res: Response): P
             email,
             password: hashedPassword,
             fullName,
+            username: normalizedUsername,
         });
 
         await newUser.save();
@@ -46,10 +61,24 @@ export const signup = async (req: Request<{}, {}, SignupBody>, res: Response): P
             _id: newUser._id,
             email: newUser.email,
             fullName: newUser.fullName,
+            username: newUser.username,
             profilePic: newUser.profilePic,
         });
 
     } catch (error) {
+        const mongoError = error as { code?: number; keyPattern?: Record<string, number> };
+        if (mongoError?.code === 11000) {
+            if (mongoError.keyPattern?.username) {
+                res.status(400).json({ message: "Username already taken!" });
+                return;
+            }
+
+            if (mongoError.keyPattern?.email) {
+                res.status(400).json({ message: "Email already exists!" });
+                return;
+            }
+        }
+
         console.error(error);
         res.status(500).json({ message: "Server error!" });
     }
@@ -82,6 +111,7 @@ export const login = async (req: Request<{}, {}, { email: string; password: stri
             _id: user._id,
             email: user.email,
             fullName: user.fullName,
+            username: user.username,
             profilePic: user.profilePic
         });
     }catch(error){        

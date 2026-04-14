@@ -1,41 +1,67 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useChatStore } from "../hook/useChatStore"
 import SidebarSkeleton from "./skeleton/sidebarSkeleton"
-import { Users } from "lucide-react"
+import { Search, Users } from "lucide-react"
 import useAuthStore from "../hook/useAuthStore";
 const Sidebar = () => {
-    const { getUsers, isUserLoading, users, selectedChatUser, setSelectedChatUser } = useChatStore()
+    const { getUsers, searchUsers, isUserLoading, users, selectedChatUser, setSelectedChatUser } = useChatStore()
   const { onlineUsers = [] } = useAuthStore()
-    useEffect(() => {
-        getUsers()
-    }, [getUsers])
+    const [searchInput, setSearchInput] = useState("")
+    const [isSearchDelayLoading, setIsSearchDelayLoading] = useState(false)
 
-    if (isUserLoading) return <SidebarSkeleton />
+    useEffect(() => {
+      const searchTerm = searchInput.trim()
+
+      if (!searchTerm) {
+        setIsSearchDelayLoading(false)
+        getUsers()
+        return
+      }
+
+      setIsSearchDelayLoading(true)
+
+      let isCancelled = false
+      const debounceId = setTimeout(async () => {
+        await searchUsers(searchTerm)
+        if (!isCancelled) {
+          setIsSearchDelayLoading(false)
+        }
+      }, 2000)
+
+      return () => {
+        isCancelled = true
+        clearTimeout(debounceId)
+      }
+    }, [searchInput, searchUsers, getUsers])
+
+  const showSkeleton = isUserLoading || isSearchDelayLoading
 
   return (
     <aside className="h-full w-20 lg:w-72 border-r border-base-300 flex flex-col transition-all duration-200">
       <div className="border-b border-base-300 w-full p-5">
         <div className="flex items-center gap-2">
           <Users className="size-6" />
-          <span className="font-medium hidden lg:block">Contacts</span>
+          <span className="font-medium hidden lg:block">Chats</span>
         </div>
-        {/* TODO: Online filter toggle */}
-        {/* <div className="mt-3 hidden lg:flex items-center gap-2">
-          <label className="cursor-pointer flex items-center gap-2">
+
+        <div className="mt-3 hidden lg:block">
+          <div className="relative">
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
             <input
-              type="checkbox"
-              checked={showOnlineOnly}
-              onChange={(e) => setShowOnlineOnly(e.target.checked)}
-              className="checkbox checkbox-sm"
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value.toLowerCase())}
+              placeholder="Search by username"
+              className="input input-sm input-bordered w-full pl-9"
             />
-            <span className="text-sm">Show online only</span>
-          </label>
-          <span className="text-xs text-zinc-500">({onlineUsers.length - 1} online)</span>
-        </div> */}
+          </div>
+        </div>
       </div>
 
       <div className="overflow-y-auto w-full py-3">
-        {users.map((user) => (
+        {showSkeleton && <SidebarSkeleton listOnly />}
+
+        {!showSkeleton && users.map((user) => (
           <button
             key={user._id}
             onClick={() => setSelectedChatUser(user)}
@@ -62,6 +88,9 @@ const Sidebar = () => {
             {/* User info - only visible on larger screens */}
             <div className="hidden lg:block text-left min-w-0">
               <div className="font-medium truncate">{user.fullName}</div>
+              <div className="text-xs text-zinc-400 truncate">
+                {user.username ? `@${user.username}` : "No username"}
+              </div>
               <div className="text-sm text-zinc-400">
                 {onlineUsers.includes(user._id) ? "Online" : "Offline"}
               </div>
@@ -69,8 +98,12 @@ const Sidebar = () => {
           </button>
         ))}
 
-        {users.length === 0 && (
-          <div className="text-center text-zinc-500 py-4">No online users</div>
+        {!showSkeleton && users.length === 0 && (
+          <div className="text-center text-zinc-500 py-4 px-3 text-sm">
+            {searchInput.trim()
+              ? "No users found for this username"
+              : "No chats yet. Search a username to start chatting."}
+          </div>
         )}
       </div>
     </aside>

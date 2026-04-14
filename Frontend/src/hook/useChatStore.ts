@@ -7,6 +7,7 @@ import useAuthStore from './useAuthStore.js'
 interface User {
     _id: string
     fullName: string
+    username?: string
     email: string
     profilePic?: string
     createdAt: string
@@ -49,6 +50,7 @@ interface ChatStore {
     unsubscribeFromMessages: () => void
     SubscribeToMsgs: () => void
     getUsers: () => Promise<void>
+    searchUsers: (username: string) => Promise<void>
     getMsgs: (userId: string) => Promise<void>
     loadOlderMsgs: (userId: string) => Promise<void>
     markMsgsAsSeen: (userId: string) => Promise<void>
@@ -79,6 +81,25 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
             toast.error(err.response?.data?.message ?? 'Failed to load users');
         } finally {
             set({ isUserLoading: false });
+        }
+    },
+
+    searchUsers: async (username: string) => {
+        const searchTerm = username.trim()
+        if (!searchTerm) {
+            await get().getUsers()
+            return
+        }
+
+        set({ isUserLoading: true })
+        try {
+            const res = await axiosInstance.get<User[]>(`/messages/search?username=${encodeURIComponent(searchTerm)}`)
+            set({ users: res.data })
+        } catch (error) {
+            const err = error as AxiosError<{ message: string }>
+            toast.error(err.response?.data?.message ?? 'Failed to search users')
+        } finally {
+            set({ isUserLoading: false })
         }
     },
 

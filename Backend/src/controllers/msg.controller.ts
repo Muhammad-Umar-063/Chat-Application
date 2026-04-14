@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import User from '../models/user.model.ts';
 import Msgs from '../models/msg.model.ts';
 import cloudinary from '../lib/cloudinary.ts';
@@ -59,12 +60,87 @@ export const getMsgs = async (req : express.Request, res : express.Response) => 
 
 export const getUsersForSidebar = async (req : express.Request, res : express.Response) => {
     try{
-        const loggedInUserId = req.user._id as string;
-        const getUsers = await User.find({_id: { $ne : loggedInUserId }}).select('-password');
-        res.status(200).json(getUsers);
+        const loggedInUserId = req.userId as string;
+        if (!loggedInUserId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+
+        const myObjectId = new mongoose.Types.ObjectId(loggedInUserId);
+
+        const chattedUserIds = await Msgs.aggregate([
+            {
+                $match: {
+                    $or: [{ senderId: myObjectId }, { receiverId: myObjectId }],
+                },
+            },
+            { $sort: { createdAt: -1 } },
+            {
+                $project: {
+                    otherUserId: {
+                        $cond: [{ $eq: ["$senderId", myObjectId] }, "$receiverId", "$senderId"],
+                    },
+                    createdAt: 1,
+                },
+            },
+            {
+                $group: {
+                    _id: "$otherUserId",
+                    lastMessageAt: { $max: "$createdAt" },
+                },
+            },
+            { $sort: { lastMessageAt: -1 } },
+        ]);
+
+        const orderedIds = chattedUserIds.map((entry) => entry._id.toString());
+
+        if (!orderedIds.length) {
+            res.status(200).json([]);
+            return;
+        }
+
+        const users = await User.find({ _id: { $in: orderedIds } }).select('-password');
+        const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+        const orderedUsers = orderedIds
+            .map((id) => usersById.get(id))
+            .filter(Boolean);
+
+        res.status(200).json(orderedUsers);
     } catch (error) {
         console.error("Error fetching users for sidebar:", error);
         res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+export const searchUsersByUsername = async (req: express.Request, res: express.Response) => {
+    try {
+        const myId = req.userId as string;
+        if (!myId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+
+        const rawUsername = typeof req.query.username === 'string' ? req.query.username : '';
+        const searchTerm = rawUsername.trim().toLowerCase();
+
+        if (!searchTerm) {
+            res.status(200).json([]);
+            return;
+        }
+
+        const escapedSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const users = await User.find({
+            _id: { $ne: myId },
+            username: { $regex: `^${escapedSearch}`, $options: 'i' },
+        })
+            .select('-password')
+            .limit(20);
+
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Error searching users by username:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 }
 
