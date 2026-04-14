@@ -9,19 +9,48 @@ export const getMsgs = async (req : express.Request, res : express.Response) => 
     try {
         const { id: otherUserId } = req.params as { id: string };
         const myId = req.userId as string;
+        const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+        const rawBefore = Array.isArray(req.query.before) ? req.query.before[0] : req.query.before;
+        const parsedLimit = Number.parseInt((rawLimit as string) ?? "30", 10);
+        const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 30;
 
         if (!myId) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
 
-        const Messages = await Msgs.find({
+        const conversationFilter = {
             $or: [
                 {senderId: myId, receiverId: otherUserId},
                 {senderId: otherUserId, receiverId: myId}
             ]
-        }).sort({ createdAt: 1 })
-        res.status(200).json(Messages);
+        };
+
+        const queryFilter: Record<string, unknown> = { ...conversationFilter };
+        if (rawBefore) {
+            const beforeDate = new Date(rawBefore as string);
+            if (!Number.isNaN(beforeDate.getTime())) {
+                queryFilter.createdAt = { $lt: beforeDate };
+            }
+        }
+
+        const latestChunk = await Msgs.find(queryFilter)
+            .sort({ createdAt: -1 })
+            .limit(limit);
+
+        const messages = [...latestChunk].reverse();
+
+        let hasMore = false;
+        if (messages.length > 0) {
+            const oldestLoadedDate = messages[0].createdAt;
+            const olderExists = await Msgs.exists({
+                ...conversationFilter,
+                createdAt: { $lt: oldestLoadedDate },
+            });
+            hasMore = Boolean(olderExists);
+        }
+
+        res.status(200).json({ messages, hasMore });
     } catch (error) {
         console.error("Error fetching messages:", error);
         res.status(500).json({ error: "Internal server error" });

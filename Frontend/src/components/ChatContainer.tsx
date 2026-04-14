@@ -10,30 +10,75 @@ import { X } from "lucide-react"
 
 const ChatContainer = () => {
 
-    const { selectedChatUser, messages, isMsgLoading, getMsgs, SubscribeToMsgs, unsubscribeFromMessages, isOtherUserTyping, markMsgsAsSeen } = useChatStore()
+    const {
+      selectedChatUser,
+      messages,
+      isMsgLoading,
+      getMsgs,
+      loadOlderMsgs,
+      hasMoreMsgs,
+      isLoadingOlderMsgs,
+      SubscribeToMsgs,
+      unsubscribeFromMessages,
+      isOtherUserTyping,
+      markMsgsAsSeen,
+    } = useChatStore()
     const { authUser } = useAuthStore()
     const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+    const previousMessageCountRef = useRef(0)
+    const didInitialScrollRef = useRef(false)
     const [previewImage, setPreviewImage] = useState<string | null>(null)
 
     useEffect(() => {
       if (!selectedChatUser?._id) return
+
+      didInitialScrollRef.current = false
+      previousMessageCountRef.current = 0
       getMsgs(selectedChatUser._id)
       SubscribeToMsgs()
+
       return () => {
         unsubscribeFromMessages()
       }
     }, [selectedChatUser?._id])
 
     useEffect(() => {
-      if (messages.length > 0) {
-        setTimeout(() => {
-          messagesContainerRef.current?.scrollTo({
-            top: messagesContainerRef.current.scrollHeight,
-            behavior: "smooth"
-          })
-        }, 0)
+      const container = messagesContainerRef.current
+      if (!container || isMsgLoading || !messages.length) return
+
+      // On first load of a chat, jump instantly to the latest message.
+      if (!didInitialScrollRef.current) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight
+          didInitialScrollRef.current = true
+          previousMessageCountRef.current = messages.length
+        })
+        return
       }
-    }, [messages, isOtherUserTyping])
+
+      // Auto-scroll only when user is already near bottom and new messages arrive.
+      const hasNewMessage = messages.length > previousMessageCountRef.current
+      if (hasNewMessage) {
+        const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight)
+        if (distanceFromBottom < 180) {
+          container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })
+        }
+      }
+
+      previousMessageCountRef.current = messages.length
+    }, [messages.length, isMsgLoading])
+
+    useEffect(() => {
+      if (!isOtherUserTyping) return
+
+      const container = messagesContainerRef.current
+      if (!container) return
+
+      const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight)
+      if (distanceFromBottom < 180) {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" })
+      }
+    }, [isOtherUserTyping])
 
     useEffect(() => {
       if (!selectedChatUser?._id || !authUser?._id) return
@@ -51,6 +96,24 @@ const ChatContainer = () => {
       }
     }, [messages, selectedChatUser?._id, authUser?._id, markMsgsAsSeen])
 
+    const handleMessagesScroll = async () => {
+      const container = messagesContainerRef.current
+      if (!container || !selectedChatUser?._id) return
+      if (!hasMoreMsgs || isLoadingOlderMsgs) return
+
+      if (container.scrollTop <= 80) {
+        const previousScrollHeight = container.scrollHeight
+        const previousScrollTop = container.scrollTop
+
+        await loadOlderMsgs(selectedChatUser._id)
+
+        requestAnimationFrame(() => {
+          const nextScrollHeight = container.scrollHeight
+          container.scrollTop = nextScrollHeight - previousScrollHeight + previousScrollTop
+        })
+      }
+    }
+
     if (isMsgLoading) {
       return (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -66,7 +129,14 @@ const ChatContainer = () => {
 <div className="flex-1 flex flex-col overflow-hidden">
       <ChatHeader />
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={messagesContainerRef}>
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+      >
+        {isLoadingOlderMsgs && (
+          <div className="text-center text-xs opacity-60 py-1">Loading older messages...</div>
+        )}
         {messages.map((message) => {
           const messageSenderId =
             typeof message.senderId === "string"

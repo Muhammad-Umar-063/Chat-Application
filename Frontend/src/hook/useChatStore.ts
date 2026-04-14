@@ -15,7 +15,7 @@ interface User {
 interface Message {
     _id: string
     senderId?: string | { _id: string }
-    receiverId?: string
+    receiverId?: string | { _id: string }
     sender?: User | string
     text?: string
     message?: string
@@ -25,6 +25,16 @@ interface Message {
     seenAt?: string | null
 }
 
+interface GetMsgsResponse {
+    messages: Message[]
+    hasMore: boolean
+}
+
+const extractId = (value?: string | { _id: string } | null): string | undefined => {
+    if (!value) return undefined
+    return typeof value === 'string' ? value : value._id
+}
+
 interface ChatStore {
     users: User[]
     messages: Message[]
@@ -32,11 +42,15 @@ interface ChatStore {
     isUserLoading: boolean,
     isMsgLoading: boolean,
     isOtherUserTyping: boolean
+    hasMoreMsgs: boolean
+    isLoadingOlderMsgs: boolean
+    oldestMsgCreatedAt: string | null
 
     unsubscribeFromMessages: () => void
     SubscribeToMsgs: () => void
     getUsers: () => Promise<void>
     getMsgs: (userId: string) => Promise<void>
+    loadOlderMsgs: (userId: string) => Promise<void>
     markMsgsAsSeen: (userId: string) => Promise<void>
     sendMsg: (userId: string, text: string, image?: string) => Promise<void>
     setSelectedChatUser: (selectedChatUser: User | null) => void
@@ -50,6 +64,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     isUserLoading: false,
     isMsgLoading: false,
     isOtherUserTyping: false,
+    hasMoreMsgs: false,
+    isLoadingOlderMsgs: false,
+    oldestMsgCreatedAt: null,
 
 
     getUsers: async () => {
@@ -66,16 +83,65 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     },
 
     getMsgs: async (userId: string) => {
-        set({ isMsgLoading: true });
+        set({
+            isMsgLoading: true,
+            messages: [],
+            hasMoreMsgs: false,
+            oldestMsgCreatedAt: null,
+        });
         try {
-            const res = await axiosInstance.get<Message[]>(`/messages/${userId}`)
-            set({ messages: res.data })
+            const res = await axiosInstance.get<GetMsgsResponse | Message[]>(`/messages/${userId}?limit=30`)
+            const payload = Array.isArray(res.data)
+                ? { messages: res.data, hasMore: false }
+                : res.data
+
+            const nextMessages = payload.messages ?? []
+
+            set({
+                messages: nextMessages,
+                hasMoreMsgs: Boolean(payload.hasMore),
+                oldestMsgCreatedAt: nextMessages.length ? nextMessages[0].createdAt : null,
+            })
             await get().markMsgsAsSeen(userId)
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
             toast.error(err.response?.data?.message ?? 'Failed to load messages');
         } finally {
             set({ isMsgLoading: false });
+        }
+    },
+
+    loadOlderMsgs: async (userId: string) => {
+        const { hasMoreMsgs, isLoadingOlderMsgs, oldestMsgCreatedAt } = get()
+        if (!hasMoreMsgs || isLoadingOlderMsgs || !oldestMsgCreatedAt) return
+
+        set({ isLoadingOlderMsgs: true })
+        try {
+            const res = await axiosInstance.get<GetMsgsResponse | Message[]>(
+                `/messages/${userId}?limit=30&before=${encodeURIComponent(oldestMsgCreatedAt)}`
+            )
+
+            const payload = Array.isArray(res.data)
+                ? { messages: res.data, hasMore: false }
+                : res.data
+
+            const olderBatch = payload.messages ?? []
+
+            set((state) => {
+                const existingIds = new Set(state.messages.map((msg) => msg._id))
+                const uniqueOlder = olderBatch.filter((msg) => !existingIds.has(msg._id))
+                const mergedMessages = [...uniqueOlder, ...state.messages]
+
+                return {
+                    messages: mergedMessages,
+                    hasMoreMsgs: Boolean(payload.hasMore),
+                    oldestMsgCreatedAt: mergedMessages.length ? mergedMessages[0].createdAt : null,
+                }
+            })
+        } catch (error) {
+            console.error('Failed to load older messages:', error)
+        } finally {
+            set({ isLoadingOlderMsgs: false })
         }
     },
 
@@ -122,10 +188,29 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         socket.off("stopTyping")
         socket.off("messagesSeen")
 
-        socket.on("newMessage", (newMessage) => {
-            set({
-                messages: [...get().messages, newMessage]
+        socket.on("newMessage", (newMessage: Message) => {
+            const activeUserId = get().selectedChatUser?._id
+            if (!activeUserId) return
+
+            const senderId = extractId(newMessage.senderId) ??
+                (typeof newMessage.sender === 'string' ? newMessage.sender : newMessage.sender?._id)
+            const receiverId = extractId(newMessage.receiverId)
+
+            const isForActiveChat = senderId === activeUserId || receiverId === activeUserId
+            if (!isForActiveChat) return
+
+            set((state) => {
+                if (state.messages.some((msg) => msg._id === newMessage._id)) {
+                    return state
+                }
+                return {
+                    messages: [...state.messages, newMessage],
+                }
             })
+
+            if (senderId === activeUserId) {
+                get().markMsgsAsSeen(activeUserId)
+            }
         })
 
         socket.on("typing", () => {
