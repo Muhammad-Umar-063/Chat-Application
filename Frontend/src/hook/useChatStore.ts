@@ -21,6 +21,8 @@ interface Message {
     message?: string
     createdAt: string,
     image?: string | null
+    seen?: boolean
+    seenAt?: string | null
 }
 
 interface ChatStore {
@@ -35,6 +37,7 @@ interface ChatStore {
     SubscribeToMsgs: () => void
     getUsers: () => Promise<void>
     getMsgs: (userId: string) => Promise<void>
+    markMsgsAsSeen: (userId: string) => Promise<void>
     sendMsg: (userId: string, text: string, image?: string) => Promise<void>
     setSelectedChatUser: (selectedChatUser: User | null) => void
     setIsOtherUserTyping: (isTyping: boolean) => void
@@ -67,11 +70,32 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         try {
             const res = await axiosInstance.get<Message[]>(`/messages/${userId}`)
             set({ messages: res.data })
+            await get().markMsgsAsSeen(userId)
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
             toast.error(err.response?.data?.message ?? 'Failed to load messages');
         } finally {
             set({ isMsgLoading: false });
+        }
+    },
+
+    markMsgsAsSeen: async (userId: string) => {
+        try {
+            const res = await axiosInstance.post<{ messageIds: string[]; seenAt?: string }>(`/messages/seen/${userId}`)
+            const messageIds = res.data.messageIds ?? []
+            const seenAt = res.data.seenAt ?? new Date().toISOString()
+
+            if (!messageIds.length) return
+
+            set((state) => ({
+                messages: state.messages.map((msg) =>
+                    messageIds.includes(msg._id)
+                        ? { ...msg, seen: true, seenAt }
+                        : msg
+                ),
+            }))
+        } catch (error) {
+            console.error('Failed to mark messages as seen:', error)
         }
     },
 
@@ -96,6 +120,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         socket.off("newMessage")
         socket.off("typing")
         socket.off("stopTyping")
+        socket.off("messagesSeen")
 
         socket.on("newMessage", (newMessage) => {
             set({
@@ -110,6 +135,16 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         socket.on("stopTyping", () => {
             set({ isOtherUserTyping: false })
         })
+
+        socket.on("messagesSeen", ({ messageIds, seenAt }: { messageIds: string[]; seenAt: string }) => {
+            set((state) => ({
+                messages: state.messages.map((msg) =>
+                    messageIds.includes(msg._id)
+                        ? { ...msg, seen: true, seenAt }
+                        : msg
+                ),
+            }))
+        })
     },
 
     unsubscribeFromMessages: () => {
@@ -117,6 +152,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     socket?.off("newMessage");
     socket?.off("typing");
     socket?.off("stopTyping");
+    socket?.off("messagesSeen");
   },
 
 

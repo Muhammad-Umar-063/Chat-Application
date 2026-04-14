@@ -77,3 +77,52 @@ export const sendMsgs = async (req : express.Request, res : express.Response) =>
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
+export const markMsgsAsSeen = async (req: express.Request, res: express.Response) => {
+    try {
+        const myId = req.userId as string;
+        const { id: otherUserId } = req.params as { id: string };
+
+        if (!myId) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+
+        const unseenMessages = await Msgs.find({
+            senderId: otherUserId,
+            receiverId: myId,
+            seen: false,
+        }).select("_id");
+
+        if (!unseenMessages.length) {
+            res.status(200).json({ updatedCount: 0, messageIds: [] });
+            return;
+        }
+
+        const messageIds = unseenMessages.map((msg) => msg._id.toString());
+        const seenAt = new Date();
+
+        await Msgs.updateMany(
+            { _id: { $in: messageIds } },
+            { $set: { seen: true, seenAt } }
+        );
+
+        const senderSocketId = getReceiverSocketId(otherUserId);
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesSeen", {
+                by: myId,
+                messageIds,
+                seenAt: seenAt.toISOString(),
+            });
+        }
+
+        res.status(200).json({
+            updatedCount: messageIds.length,
+            messageIds,
+            seenAt: seenAt.toISOString(),
+        });
+    } catch (error) {
+        console.error("Error marking messages as seen:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}

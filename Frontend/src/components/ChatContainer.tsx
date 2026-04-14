@@ -3,14 +3,14 @@ import { useChatStore } from "../hook/useChatStore"
 import ChatHeader from "./ChatHeader"
 import MsgInput from "./MsgInput"
 import MessageSkeleton from "./skeleton/MessageSkeleton"
-import { formatMessageTime } from "../lib/utils"
+import { formatMessageTime, formatRelativeTime } from "../lib/utils"
 import useAuthStore from "../hook/useAuthStore"
 import { X } from "lucide-react"
 
 
 const ChatContainer = () => {
 
-    const { selectedChatUser, messages, isMsgLoading, getMsgs, SubscribeToMsgs, unsubscribeFromMessages, isOtherUserTyping } = useChatStore()
+    const { selectedChatUser, messages, isMsgLoading, getMsgs, SubscribeToMsgs, unsubscribeFromMessages, isOtherUserTyping, markMsgsAsSeen } = useChatStore()
     const { authUser } = useAuthStore()
     const messagesContainerRef = useRef<HTMLDivElement | null>(null)
     const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -34,6 +34,22 @@ const ChatContainer = () => {
         }, 0)
       }
     }, [messages, isOtherUserTyping])
+
+    useEffect(() => {
+      if (!selectedChatUser?._id || !authUser?._id) return
+
+      const hasIncomingUnseen = messages.some((message) => {
+        const senderId =
+          typeof message.senderId === "string"
+            ? message.senderId
+            : message.senderId?._id
+        return senderId === selectedChatUser._id && !message.seen
+      })
+
+      if (hasIncomingUnseen) {
+        markMsgsAsSeen(selectedChatUser._id)
+      }
+    }, [messages, selectedChatUser?._id, authUser?._id, markMsgsAsSeen])
 
     if (isMsgLoading) {
       return (
@@ -59,12 +75,13 @@ const ChatContainer = () => {
                 (typeof message.sender === "string" ? message.sender : message.sender?._id)
           const isMine = messageSenderId === authUser?._id
           const messageText = message.text ?? message.message
-
+          const statusText = `${message.seen ? "Seen" : "Sent"} ${formatRelativeTime(message.seenAt || message.createdAt)}`
+          
           return (
-          <div
+            <div
             key={message._id}
             className={`chat ${isMine ? "chat-end" : "chat-start"}`}
-          >
+            >
             <div className=" chat-image avatar">
               <div className="size-10 rounded-full border">
                 <img
@@ -93,6 +110,9 @@ const ChatContainer = () => {
               )}
               {messageText && <p>{messageText}</p>}
             </div>
+              {isMine && (
+                <p className="mt-1 text-[9px] opacity-70 text-right">{statusText}</p>
+              )}
           </div>
         )})}
         {isOtherUserTyping && (

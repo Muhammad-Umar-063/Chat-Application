@@ -1,5 +1,5 @@
 import express, {Router} from 'express';
-import { getMsgs, getUsersForSidebar, sendMsgs } from '../controllers/msg.controller.ts';
+import { getMsgs, getUsersForSidebar, markMsgsAsSeen, sendMsgs } from '../controllers/msg.controller.ts';
 import { protectRoute } from '../middleware/auth.middleware.ts';
 
 const router: Router = express.Router();
@@ -7,5 +7,6 @@ const router: Router = express.Router();
 router.get('/users', protectRoute, getUsersForSidebar)
 router.get('/:id', protectRoute, getMsgs)
 router.post('/send/:id', protectRoute, sendMsgs)
+router.post('/seen/:id', protectRoute, markMsgsAsSeen)
 
 export default router;
