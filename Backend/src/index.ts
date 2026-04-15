@@ -3,6 +3,7 @@ import authRoutees from './routes/auth.routes.ts';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { connectDB } from './lib/db.ts';
 import cookieParser from 'cookie-parser';
 import msgRoutes from './routes/msg.routes.ts';
@@ -16,6 +17,7 @@ const allowedOrigins = (process.env.CLIENT_URLS || 'http://localhost:5173')
     .filter(Boolean)
 
 const __dirname = path.resolve();
+const frontendDistPath = path.join(__dirname, '../Frontend/dist');
 
 app.use(cors({
         origin: allowedOrigins,
@@ -28,11 +30,11 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutees);
 app.use("/api/messages", msgRoutes);
 
-if (process.env.NODE_ENV === 'production'){
-    app.use(express.static(path.join(__dirname, '../Frontend/dist')));
+if (process.env.NODE_ENV === 'production' && fs.existsSync(frontendDistPath)){
+    app.use(express.static(frontendDistPath));
 
     app.get(/.*/, (req : express.Request, res : express.Response) => {
-        res.sendFile(path.join(__dirname, '../Frontend', 'dist', 'index.html'));
+        res.sendFile(path.join(frontendDistPath, 'index.html'));
     })
 }
 
