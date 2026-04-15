@@ -1,5 +1,5 @@
 import express, {Router} from 'express';
-import { getMsgs, getUsersForSidebar, markMsgsAsSeen, searchUsersByUsername, sendMsgs } from '../controllers/msg.controller.ts';
+import { getMsgs, getUsersForSidebar, markMsgsAsSeen, searchUsersByUsername, sendMsgs, deleteConversation } from '../controllers/msg.controller.ts';
 import { protectRoute } from '../middleware/auth.middleware.ts';
 
 const router: Router = express.Router();
@@ -9,5 +9,6 @@ router.get('/search', protectRoute, searchUsersByUsername)
 router.get('/:id', protectRoute, getMsgs)
 router.post('/send/:id', protectRoute, sendMsgs)
 router.post('/seen/:id', protectRoute, markMsgsAsSeen)
+router.delete('/conversation/:id', protectRoute, deleteConversation)
 
 export default router;

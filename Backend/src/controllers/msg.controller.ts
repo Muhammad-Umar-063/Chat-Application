@@ -255,3 +255,27 @@ export const markMsgsAsSeen = async (req: express.Request, res: express.Response
         res.status(500).json({ error: "Internal server error" });
     }
 }
+
+export const deleteConversation = async (req: express.Request, res: express.Response) => {
+  try {
+    const myId = req.userId as string;
+    const { id: otherUserId } = req.params as { id: string };
+
+    if (!myId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const result = await Msgs.deleteMany({
+      $or: [
+        { senderId: myId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: myId },
+      ],
+    });
+
+    res.status(200).json({ deletedCount: result.deletedCount ?? 0 });
+  } catch (error) {
+    console.error("Error deleting conversation:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

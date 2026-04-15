@@ -27,6 +27,10 @@ interface Message {
     seenAt?: string | null
 }
 
+interface DeleteConversationResponse {
+  deletedCount: number;
+}
+
 interface GetMsgsResponse {
     messages: Message[]
     hasMore: boolean
@@ -49,6 +53,7 @@ interface ChatStore {
     isLoadingOlderMsgs: boolean
     oldestMsgCreatedAt: string | null
 
+    deleteChat: (userId: string) => Promise<number>
     unsubscribeFromMessages: () => void
     SubscribeToMsgs: () => void
     getUsers: () => Promise<void>
@@ -320,6 +325,42 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
     setIsOtherUserTyping: (isTyping: boolean) => {
         set({ isOtherUserTyping: isTyping })
+    },
+
+    deleteChat: async (userId: string) => {
+    try {
+    const res = await axiosInstance.delete<DeleteConversationResponse>("/messages/conversation/" + userId);
+    const deletedCount = res.data.deletedCount ?? 0;
+
+    if (deletedCount === 0) {
+      toast("No chat history found for this user");
+      return 0;
     }
+
+    set((state) => {
+      const nextUnreadCounts = { ...state.unreadCounts };
+      delete nextUnreadCounts[userId];
+
+      const isDeletedUserSelected = state.selectedChatUser?._id === userId;
+
+      return {
+        users: state.users.filter((user) => user._id !== userId),
+        unreadCounts: nextUnreadCounts,
+        selectedChatUser: isDeletedUserSelected ? null : state.selectedChatUser,
+        messages: isDeletedUserSelected ? [] : state.messages,
+        hasMoreMsgs: isDeletedUserSelected ? false : state.hasMoreMsgs,
+        oldestMsgCreatedAt: isDeletedUserSelected ? null : state.oldestMsgCreatedAt,
+        isOtherUserTyping: isDeletedUserSelected ? false : state.isOtherUserTyping,
+      };
+    });
+
+    toast.success("Chat deleted successfully");
+    return deletedCount;
+  } catch (error) {
+    const err = error as AxiosError<{ message: string }>;
+    toast.error(err.response?.data?.message ?? "Failed to delete chat");
+    return 0;
+  }
+},
 
 }))
