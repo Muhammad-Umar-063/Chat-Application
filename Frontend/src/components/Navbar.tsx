@@ -52,7 +52,7 @@ const Navbar = () => {
 
               <ul
                 tabIndex={0}
-                className="menu menu-sm dropdown-content mt-3 z-[60] p-2 shadow bg-base-100 rounded-box w-48 border border-base-300"
+                className="menu menu-sm dropdown-content mt-3 z-60 p-2 shadow bg-base-100 rounded-box w-48 border border-base-300"
               >
                 <li>
                   <Link to="/setting" className="flex items-center gap-2">
