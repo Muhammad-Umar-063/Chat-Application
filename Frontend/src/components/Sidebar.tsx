@@ -52,14 +52,14 @@ const Sidebar = () => {
   const showSkeleton = isUserLoading || isSearchDelayLoading
 
   return (
-    <aside className="h-full w-48 sm:w-20 lg:w-72 border-r border-base-300 flex flex-col transition-all duration-200">
+    <aside className="h-full w-20 lg:w-72 border-r border-base-300 flex flex-col transition-all duration-200">
       <div className="border-b border-base-300 w-full p-5">
         <div className="flex items-center gap-2">
           <Users className="size-6" />
           <span className="font-medium hidden lg:block">Chats</span>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 hidden lg:block">
           <div className="relative">
             <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
             <input
